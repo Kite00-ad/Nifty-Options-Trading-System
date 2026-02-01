@@ -1,87 +1,73 @@
 import pandas as pd
+import numpy as np
 from src.pricing_engine import BlackScholes
 from src.data_loader import DataLoader
 from src.visualization import plot_dashboard
+from src.strategies import VolatilityStrategy # <--- NEW IMPORT
 
 # 1. Setup
-RISK_FREE_RATE = 0.07  # Assume 7% for India
+RISK_FREE_RATE = 0.07
 
 def run_analysis():
-    # Initialize Loader
     loader = DataLoader()
     
-    # Fetch real market data
+    # Fetch Data
     nifty_data = loader.fetch_underlying_data(period="6mo")
     current_spot = nifty_data['Close'].iloc[-1]
     current_vol = nifty_data['Volatility'].iloc[-1]
     
-    # YFinance fix: Extract scalar value if it's a Series
-    if isinstance(current_spot, pd.Series):
-        current_spot = current_spot.item()
-    if isinstance(current_vol, pd.Series):
-        current_vol = current_vol.item()
+    # Scalar fix
+    if isinstance(current_spot, pd.Series): current_spot = current_spot.item()
+    if isinstance(current_vol, pd.Series): current_vol = current_vol.item()
         
-    print(f"MARKET SNAPSHOT:")
-    print(f"Spot Price: {current_spot:.2f}")
-    print(f"Volatility: {current_vol:.2%}")
+    print(f"MARKET SNAPSHOT: Spot {current_spot:.0f} | Vol {current_vol:.2%}")
     
-    # Generate an Option Chain
     chain = loader.generate_dummy_option_chain(current_spot, None)
-    
-    # Calculate Prices, Greeks, AND Implied Volatility for every strike
     results = []
     
-    # ... inside run_analysis() ...
+    print("\nSimulating Market Prices (adding random noise)...")
     
     for index, row in chain.iterrows():
-        bs = BlackScholes(
-            S=row['Spot'],
-            K=row['Strike'],
-            T=row['Expiry_Days'] / 365,
-            r=RISK_FREE_RATE,
-            sigma=current_vol,
-            type='call'
-        )
+        bs = BlackScholes(row['Spot'], row['Strike'], row['Expiry_Days']/365, RISK_FREE_RATE, current_vol, 'call')
         
-        # 1. Calculate Theoretical Price & Greeks
         theoretical_price = bs.calculate_price()
-        delta = bs.calculate_delta()
-        gamma = bs.calculate_gamma()
-        theta = bs.calculate_theta()
-        vega = bs.calculate_vega()
         
-        # 2. TEST IV SOLVER
-        fake_market_price = theoretical_price * 1.10
-        implied_vol = bs.calculate_implied_volatility(fake_market_price)
+        # --- SIMULATION: Randomly mess up the market prices ---
+        # Some options will be 20% expensive, some 20% cheap
+        noise = np.random.uniform(0.80, 1.20) 
+        market_price = theoretical_price * noise
+        
+        # Calculate IV based on this messy market price
+        implied_vol = bs.calculate_implied_volatility(market_price)
 
         results.append({
-            'Spot': row['Spot'],          # <--- THIS WAS MISSING!
+            'Spot': row['Spot'],
             'Strike': row['Strike'],
             'Price': theoretical_price,
-            'Delta': delta,
-            'Gamma': gamma,
-            'Theta': theta,
-            'Vega': vega,
-            'Fake_Market_Price': fake_market_price,
+            'Market_Price': market_price, # The "noisy" price
+            'Delta': bs.calculate_delta(),
+            'Gamma': bs.calculate_gamma(),
+            'Vega': bs.calculate_vega(),
             'Real_Vol': current_vol,
             'Implied_Vol': implied_vol
         })
         
     results_df = pd.DataFrame(results)
     
-    print("\n--- CALCULATED OPTION CHAIN (ATM) ---")
+    # --- STEP 4: RUN THE STRATEGY ENGINE ---
+    strategy = VolatilityStrategy(volatility_threshold=0.01) # 1% edge required
+    analyzed_df = strategy.generate_signals(results_df)
     
-    # Find the row closest to ATM (At The Money)
-    atm_row = results_df.iloc[(results_df['Strike'] - current_spot).abs().argsort()[:1]]
-    print(atm_row.to_string(index=False))
+    trades = strategy.get_trade_log(analyzed_df)
     
-    # --- CRITICAL FIX: Save FIRST, then Plot ---
+    print(f"\n--- TRADING SIGNALS FOUND: {len(trades)} ---")
+    if not trades.empty:
+        # Show top 5 trades
+        print(trades[['Strike', 'Market_Price', 'Real_Vol', 'Implied_Vol', 'Signal']].head().to_string(index=False))
     
-    # 1. Save to CSV
-    results_df.to_csv("data/option_chain_output.csv", index=False)
-    print("\nFull chain saved to data/option_chain_output.csv")
-
-    # 2. Launch Dashboard (Now it reads the FRESH data)
+    # Save & Plot
+    analyzed_df.to_csv("data/option_chain_output.csv", index=False)
+    print("\nData saved. Launching Dashboard...")
     plot_dashboard()
 
 if __name__ == "__main__":

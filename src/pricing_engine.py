@@ -68,37 +68,36 @@ class BlackScholes:
         
     def calculate_implied_volatility(self, market_price):
         """
-        Calculates Implied Volatility (IV) using Newton-Raphson method.
-        We guess a volatility, check the price error, and adjust using Vega.
+        Calculates Implied Volatility (IV) using Newton-Raphson.
+        Includes safeguards against Arbitrage Violations.
         """
         MAX_ITERATIONS = 100
         PRECISION = 1.0e-5
         
-        # Start with a guess (e.g., 50% volatility)
+        # 1. Arbitrage Check: Price must be > Intrinsic Value
+        intrinsic_value = max(0, self.S - self.K) # Simplified intrinsic
+        if market_price <= intrinsic_value:
+            return 0.0 # Price is invalid / Arbitrage opportunity exists
+            
+        # Start with a guess
         sigma = 0.5
         
         for i in range(MAX_ITERATIONS):
-            # 1. Update our internal sigma to the guess
             self.sigma = sigma
-            
-            # 2. Calculate price and vega with this sigma
             price = self.calculate_price()
-            vega = self.calculate_vega() * 100  # Remove the /100 scaling for the math to work
+            vega = self.calculate_vega() * 100 
             
-            # 3. How far off are we?
             diff = market_price - price
             
             if abs(diff) < PRECISION:
                 return sigma
             
-            # 4. Newton-Raphson Step: Adjust guess
-            # Avoid division by zero if vega is tiny
             if abs(vega) < 1e-8:
                 return sigma 
                 
             sigma = sigma + (diff / vega)
             
-        return sigma # Return best guess if we hit max iterations
+        return sigma
 
 if __name__ == "__main__":
     # Test Case: Nifty ATM Option

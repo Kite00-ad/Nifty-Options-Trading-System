@@ -3,7 +3,8 @@ import numpy as np
 from src.pricing_engine import BlackScholes
 from src.data_loader import DataLoader
 from src.visualization import plot_dashboard
-from src.strategies import VolatilityStrategy # <--- NEW IMPORT
+from src.strategies import VolatilityStrategy
+from src.risk_manager import HedgeCalculator  # <--- NEW IMPORT
 
 # 1. Setup
 RISK_FREE_RATE = 0.07
@@ -60,13 +61,32 @@ def run_analysis():
     
     trades = strategy.get_trade_log(analyzed_df)
     
+    # ... previous code ...
     print(f"\n--- TRADING SIGNALS FOUND: {len(trades)} ---")
     if not trades.empty:
         # Show top 5 trades
         print(trades[['Strike', 'Market_Price', 'Real_Vol', 'Implied_Vol', 'Signal']].head().to_string(index=False))
-    
+        
+        # --- NEW: HEDGE CALCULATION ---
+        risk_manager = HedgeCalculator(lot_size=25)
+        hedge = risk_manager.calculate_hedge(trades)
+        
+        print(f"\n---------------------------------------------")
+        print(f">>> HEDGE EXECUTION REPORT <<<")
+        print(f"Net Portfolio Delta: {hedge['Net_Delta']:.2f}")
+        print(f"Required Hedge:      {hedge['Futures_Lots']} Lots of Nifty Futures")
+        
+        if hedge['Futures_Lots'] > 0:
+            print(f"ACTION: BUY {hedge['Futures_Lots']} Nifty Futures")
+        elif hedge['Futures_Lots'] < 0:
+            print(f"ACTION: SELL {abs(hedge['Futures_Lots'])} Nifty Futures")
+        else:
+            print(f"ACTION: NO HEDGE REQUIRED (Delta is balanced)")
+        print(f"---------------------------------------------")
+
     # Save & Plot
     analyzed_df.to_csv("data/option_chain_output.csv", index=False)
+    # ... rest of code ...
     print("\nData saved. Launching Dashboard...")
     plot_dashboard()
 

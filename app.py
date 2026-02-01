@@ -109,3 +109,41 @@ crash_test = rm.stress_test(portfolio_risk['Net_Delta'], portfolio_risk['Net_Gam
 r1, r2 = st.columns(2)
 r1.error(f"VaR (1-Day 95%): ₹{var:,.2f}")
 r2.warning(f"Stress Test (-5% Crash): ₹{crash_test:,.2f}")
+
+# --- HISTORICAL BACKTEST RESULTS ---
+st.markdown("---")
+st.subheader("📜 Historical Backtest Performance (6 Months)")
+
+try:
+    backtest_df = pd.read_csv("data/backtest_results.csv")
+    
+    # Calculate Metrics
+    initial_balance = 1000000
+    final_balance = backtest_df['Equity'].iloc[-1]
+    total_return = ((final_balance - initial_balance) / initial_balance) * 100
+    
+    # Metrics Row
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Initial Capital", f"₹{initial_balance:,.0f}")
+    m2.metric("Final Equity", f"₹{final_balance:,.2f}", delta=f"{total_return:.2f}%")
+    
+    # Draw Equity Curve
+    fig_equity = go.Figure()
+    fig_equity.add_trace(go.Scatter(
+        x=backtest_df['Date'], 
+        y=backtest_df['Equity'],
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color='#00CC96', width=2)
+    ))
+    fig_equity.update_layout(
+        title="Portfolio Equity Curve",
+        xaxis_title="Date",
+        yaxis_title="Equity (₹)",
+        template="plotly_dark",
+        height=400
+    )
+    st.plotly_chart(fig_equity, use_container_width=True)
+
+except FileNotFoundError:
+    st.warning("⚠️ No backtest data found. Run 'main.py' to generate results.")

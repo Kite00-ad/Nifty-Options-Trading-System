@@ -5,6 +5,7 @@ from src.data_loader import DataLoader
 from src.visualization import plot_dashboard
 from src.strategies import VolatilityStrategy # Upgraded
 from src.risk_manager import RiskManager      # Upgraded
+from src.backtester import Backtester
 
 RISK_FREE_RATE = 0.07
 
@@ -98,8 +99,11 @@ def run_analysis():
     print(">>> STARTING HISTORICAL BACKTEST (6 Months) <<<")
     bt = Backtester(initial_capital=1000000)
     
-    # Use the nifty_data we fetched earlier
     equity_df = bt.run_backtest(nifty_data)
+    
+    # --- NEW: SAVE RESULTS FOR DASHBOARD ---
+    equity_df.to_csv("data/backtest_results.csv", index=False)
+    print("Backtest results saved to data/backtest_results.csv")
     
     final_equity = equity_df['Equity'].iloc[-1]
     roi = ((final_equity - 1000000) / 1000000) * 100
@@ -110,6 +114,7 @@ def run_analysis():
     
     # Launch Dashboard
     plot_dashboard()
+    
 
 if __name__ == "__main__":
     run_analysis()

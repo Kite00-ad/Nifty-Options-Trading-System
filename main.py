@@ -88,7 +88,27 @@ def run_analysis():
 
     # Save
     analyzed_df.to_csv("data/option_chain_output.csv", index=False)
+    # ... previous code inside run_analysis ...
     print("\nData saved. Launching Dashboard...")
+    
+    # --- NEW: RUN BACKTEST ON FETCHED DATA ---
+    from src.backtester import Backtester
+    
+    print("\n---------------------------------------------")
+    print(">>> STARTING HISTORICAL BACKTEST (6 Months) <<<")
+    bt = Backtester(initial_capital=1000000)
+    
+    # Use the nifty_data we fetched earlier
+    equity_df = bt.run_backtest(nifty_data)
+    
+    final_equity = equity_df['Equity'].iloc[-1]
+    roi = ((final_equity - 1000000) / 1000000) * 100
+    
+    print(f"Final Portfolio Value: ₹{final_equity:,.2f}")
+    print(f"Total ROI: {roi:.2f}%")
+    print("---------------------------------------------")
+    
+    # Launch Dashboard
     plot_dashboard()
 
 if __name__ == "__main__":

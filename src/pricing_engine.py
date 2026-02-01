@@ -69,15 +69,15 @@ class BlackScholes:
     def calculate_implied_volatility(self, market_price):
         """
         Calculates Implied Volatility (IV) using Newton-Raphson.
-        Includes safeguards against Arbitrage Violations.
+        Includes safeguards against Arbitrage Violations and Negative Volatility.
         """
         MAX_ITERATIONS = 100
         PRECISION = 1.0e-5
         
         # 1. Arbitrage Check: Price must be > Intrinsic Value
-        intrinsic_value = max(0, self.S - self.K) # Simplified intrinsic
+        intrinsic_value = max(0, self.S - self.K)
         if market_price <= intrinsic_value:
-            return 0.0 # Price is invalid / Arbitrage opportunity exists
+            return 0.0 
             
         # Start with a guess
         sigma = 0.5
@@ -94,8 +94,14 @@ class BlackScholes:
             
             if abs(vega) < 1e-8:
                 return sigma 
-                
-            sigma = sigma + (diff / vega)
+            
+            # Newton Step
+            step = diff / vega
+            sigma = sigma + step
+            
+            # --- SAFETY CHECK: Prevent negative volatility ---
+            if sigma <= 0:
+                sigma = 0.001 # Reset to a small positive number if it goes negative
             
         return sigma
 

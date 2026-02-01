@@ -1,6 +1,7 @@
 import pandas as pd
 from src.pricing_engine import BlackScholes
 from src.data_loader import DataLoader
+from src.visualization import plot_dashboard
 
 # 1. Setup
 RISK_FREE_RATE = 0.07  # Assume 7% for India
@@ -27,11 +28,10 @@ def run_analysis():
     # Generate an Option Chain
     chain = loader.generate_dummy_option_chain(current_spot, None)
     
-    # Calculate Prices and Greeks for every strike in the chain
-    # ... inside run_analysis() ...
-
     # Calculate Prices, Greeks, AND Implied Volatility for every strike
     results = []
+    
+    # ... inside run_analysis() ...
     
     for index, row in chain.iterrows():
         bs = BlackScholes(
@@ -50,13 +50,12 @@ def run_analysis():
         theta = bs.calculate_theta()
         vega = bs.calculate_vega()
         
-        # 2. TEST IV SOLVER: Simulate a market price that is 10% higher
+        # 2. TEST IV SOLVER
         fake_market_price = theoretical_price * 1.10
-        
-        # 3. Calculate Implied Volatility from that fake price
         implied_vol = bs.calculate_implied_volatility(fake_market_price)
 
         results.append({
+            'Spot': row['Spot'],          # <--- THIS WAS MISSING!
             'Strike': row['Strike'],
             'Price': theoretical_price,
             'Delta': delta,
@@ -69,16 +68,21 @@ def run_analysis():
         })
         
     results_df = pd.DataFrame(results)
-    # ... rest of the code ...
+    
     print("\n--- CALCULATED OPTION CHAIN (ATM) ---")
     
     # Find the row closest to ATM (At The Money)
     atm_row = results_df.iloc[(results_df['Strike'] - current_spot).abs().argsort()[:1]]
     print(atm_row.to_string(index=False))
     
-    # Save to CSV so we can inspect it
+    # --- CRITICAL FIX: Save FIRST, then Plot ---
+    
+    # 1. Save to CSV
     results_df.to_csv("data/option_chain_output.csv", index=False)
     print("\nFull chain saved to data/option_chain_output.csv")
+
+    # 2. Launch Dashboard (Now it reads the FRESH data)
+    plot_dashboard()
 
 if __name__ == "__main__":
     run_analysis()
